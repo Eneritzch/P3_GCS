@@ -1,4 +1,4 @@
-name: CI - Django Tests
+name: CI/CD - Django
 
 # Cuándo se ejecuta el pipeline
 on:
@@ -9,6 +9,9 @@ on:
   workflow_dispatch: # permite ejecutarlo manualmente desde la pestaña Actions
 
 jobs:
+  # ====================================================================
+  # JOB 1 - CI: Pruebas automatizadas contra PostgreSQL
+  # ====================================================================
   test:
     name: Ejecutar pruebas de Django
     runs-on: ubuntu-latest
@@ -63,3 +66,65 @@ jobs:
 
       - name: Ejecutar pruebas
         run: python manage.py test --verbosity 2
+
+  # ====================================================================
+  # JOB 2 - BUILD: Construir la imagen Docker y guardarla como artefacto
+  #          Solo se ejecuta si el job 'test' terminó con éxito.
+  # ====================================================================
+  build:
+    name: Construir imagen Docker
+    needs: test # depende de que las pruebas pasen
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir la imagen Docker
+        run: |
+          docker build -t gcs-web:latest -t gcs-web:${{ github.sha }} .
+          echo "Imagen construida correctamente:"
+          docker images gcs-web
+
+      - name: Empaquetar la imagen en un archivo .tar
+        run: docker save gcs-web:latest -o gcs-web-image.tar
+
+      - name: Subir la imagen como artefacto de GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagen-docker-django
+          path: gcs-web-image.tar
+          retention-days: 7
+
+      # ----------------------------------------------------------------
+      # DESPLIEGUE A DOCKERHUB (SIMULADO)
+      # Se imprime lo que se ejecutaría en un despliegue real. Para
+      # activarlo de verdad: descomentar el bloque y crear los secrets
+      # DOCKERHUB_USER y DOCKERHUB_TOKEN en Settings > Secrets.
+      # ----------------------------------------------------------------
+      - name: (SIMULADO) Publicar imagen en DockerHub
+        run: |
+          echo "=========================================================="
+          echo " SIMULACIÓN DE PUSH A DOCKERHUB"
+          echo "=========================================================="
+          echo "En un despliegue real se ejecutaría:"
+          echo "  docker login -u \$DOCKERHUB_USER -p \$DOCKERHUB_TOKEN"
+          echo "  docker tag gcs-web:latest \$DOCKERHUB_USER/gcs-web:latest"
+          echo "  docker push \$DOCKERHUB_USER/gcs-web:latest"
+          echo "Imagen lista para desplegar: gcs-web:${{ github.sha }}"
+
+      # --- BLOQUE REAL (DESACTIVADO). Descomentar para usar DockerHub ---
+      # - name: Login en DockerHub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USER }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Construir y publicar
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: ${{ secrets.DOCKERHUB_USER }}/gcs-web:latest
