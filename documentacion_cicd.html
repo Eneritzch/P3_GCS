@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Flujo CI/CD para Django</title>
+<style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; color: #1f2933;
+           line-height: 1.55; font-size: 11pt; margin: 0; }
+    h1, h2, h3 { color: #1d4ed8; line-height: 1.2; }
+    h1 { font-size: 22pt; }
+    h2 { font-size: 15pt; border-bottom: 2px solid #dbeafe; padding-bottom: .2rem;
+         margin-top: 1.6rem; }
+    h3 { font-size: 12pt; color: #2563eb; margin-bottom: .3rem; }
+    code { background: #f1f5f9; padding: .1rem .35rem; border-radius: 4px;
+           font-family: Consolas, monospace; font-size: 9.5pt; color: #b91c1c; }
+    pre { background: #0f172a; color: #e2e8f0; padding: .8rem 1rem; border-radius: 8px;
+          overflow-x: auto; font-family: Consolas, monospace; font-size: 9pt;
+          line-height: 1.4; }
+    pre code { background: none; color: inherit; padding: 0; }
+    table { width: 100%; border-collapse: collapse; margin: .6rem 0; font-size: 10pt; }
+    th, td { border: 1px solid #cbd5e1; padding: .4rem .6rem; text-align: left;
+             vertical-align: top; }
+    th { background: #eff6ff; color: #1e40af; }
+    .cover { text-align: center; padding-top: 38mm; page-break-after: always; }
+    .cover h1 { font-size: 30pt; margin-bottom: .4rem; }
+    .cover .sub { font-size: 14pt; color: #64748b; }
+    .cover .meta { margin-top: 30mm; font-size: 12pt; line-height: 2; }
+    .cover .badge { display: inline-block; background: #1d4ed8; color: #fff;
+                    padding: .4rem 1.2rem; border-radius: 999px; font-size: 11pt;
+                    margin-top: 1rem; letter-spacing: .5px; }
+    .ok { color: #16a34a; font-weight: 700; }
+    .page-break { page-break-before: always; }
+    .nota { background: #fffbeb; border-left: 4px solid #f59e0b; padding: .6rem .9rem;
+            border-radius: 4px; font-size: 10pt; margin: .8rem 0; }
+    .tip { background: #eff6ff; border-left: 4px solid #2563eb; padding: .6rem .9rem;
+           border-radius: 4px; font-size: 10pt; margin: .8rem 0; }
+    ul.compact { margin: .3rem 0; }
+    /* ----- Diagrama de flujo ----- */
+    .flow { display: flex; flex-direction: column; align-items: center; gap: 0;
+            margin: 1rem 0; }
+    .stage { width: 92%; border: 2px solid #2563eb; border-radius: 10px;
+             padding: .7rem 1rem; background: #f8fafc; }
+    .stage .titulo { font-weight: 700; color: #1d4ed8; margin-bottom: .25rem; }
+    .stage small { color: #475569; font-size: 9pt; }
+    .stage.ci { border-color: #16a34a; }
+    .stage.ci .titulo { color: #15803d; }
+    .stage.build { border-color: #d97706; }
+    .stage.build .titulo { color: #b45309; }
+    .stage.deploy { border-color: #9333ea; }
+    .stage.deploy .titulo { color: #7e22ce; }
+    .arrow { font-size: 18pt; color: #94a3b8; margin: .15rem 0; }
+    .footer { text-align: center; color: #94a3b8; font-size: 8.5pt; margin-top: 2rem; }
+</style>
+</head>
+<body>
+
+<!-- ===================== PORTADA ===================== -->
+<div class="cover">
+    <h1>Flujo CI/CD para Django</h1>
+    <div class="sub">Integración y Despliegue Continuo con GitHub Actions y Docker</div>
+    <div class="badge">Pipeline CI / Build / Deploy</div>
+    <div class="meta">
+        <strong>Proyecto:</strong> Sistema de Gestión de Tareas (Django + PostgreSQL)<br>
+        <strong>Repositorio:</strong> github.com/Eneritzch/P3_GCS<br>
+        <strong>Fecha:</strong> 18 de junio de 2026
+    </div>
+</div>
+
+<!-- ===================== 1. INTRODUCCIÓN ===================== -->
+<h2>1. Introducción y objetivo</h2>
+<p>Este documento describe el <strong>pipeline de CI/CD</strong> construido para una
+aplicación web desarrollada en <strong>Django</strong> con base de datos
+<strong>PostgreSQL</strong>. El objetivo es automatizar tres tareas que
+tradicionalmente se hacían a mano:</p>
+<ul class="compact">
+    <li><strong>CI (Integración Continua):</strong> ejecutar las pruebas automáticas
+        cada vez que se sube código, para detectar errores temprano.</li>
+    <li><strong>Build:</strong> empaquetar la aplicación en una imagen Docker
+        reproducible.</li>
+    <li><strong>CD (Despliegue Continuo, simulado):</strong> publicar/entregar la
+        imagen y levantarla con Docker Compose para validarla.</li>
+</ul>
+
+<!-- ===================== 2. PROYECTO ===================== -->
+<h2>2. Descripción del proyecto</h2>
+<p>La aplicación es un gestor de tareas (CRUD) con una app funcional. Estructura:</p>
+<pre><code>P3_GCS/
+├── manage.py                 # utilidad de administración de Django
+├── requirements.txt          # dependencias (Django, psycopg2, gunicorn)
+├── project/                  # configuración del proyecto
+│   ├── settings.py           #   BD vía variables de entorno (Postgres/SQLite)
+│   ├── urls.py · wsgi.py · asgi.py
+├── app/                      # aplicación funcional
+│   ├── models.py (Tarea) · views.py · forms.py · urls.py
+│   ├── admin.py · tests.py (11 pruebas)
+│   └── templates/app/lista_tareas.html
+├── Dockerfile                # imagen del servicio web (Python 3.10)
+├── docker-compose.yml        # orquesta web (Django) + db (PostgreSQL)
+├── entrypoint.sh             # espera BD → migra → arranca Gunicorn
+└── .github/workflows/ci.yml  # pipeline CI/CD</code></pre>
+
+<!-- ===================== 3. DIAGRAMA ===================== -->
+<h2>3. Diagrama del flujo CI/CD</h2>
+<div class="flow">
+    <div class="stage">
+        <div class="titulo">👩‍💻 Desarrollador</div>
+        <small>Escribe código y ejecuta <code>git push</code> a la rama
+        <code>main</code> / <code>ci-setup</code></small>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="stage">
+        <div class="titulo">🐙 GitHub — disparador del workflow</div>
+        <small>El evento <code>push</code> / <code>pull_request</code> activa
+        GitHub Actions (<code>ci.yml</code>)</small>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="stage ci">
+        <div class="titulo">✅ JOB 1 · test (Integración Continua)</div>
+        <small>Levanta servicio PostgreSQL 15 → instala Python 3.10 + dependencias →
+        <code>migrate</code> → <code>python manage.py test</code></small>
+    </div>
+    <div class="arrow">▼ <small>solo si los tests pasan (needs: test)</small></div>
+    <div class="stage build">
+        <div class="titulo">🐳 JOB 2 · build (Construcción)</div>
+        <small><code>docker build</code> → <code>docker save</code> →
+        sube artefacto <code>imagen-docker-django</code> → (simulado) push a DockerHub</small>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="stage deploy">
+        <div class="titulo">🚀 Despliegue simulado</div>
+        <small>Carpeta externa → <code>git clone</code> / <code>docker load</code> →
+        <code>docker compose up</code> → validación en navegador (HTTP 200)</small>
+    </div>
+</div>
+
+<!-- ===================== 4. EXPLICACIÓN DEL YML ===================== -->
+<div class="page-break"></div>
+<h2>4. Explicación del archivo de GitHub Actions (<code>ci.yml</code>)</h2>
+
+<h3>4.1. Disparadores (<code>on</code>)</h3>
+<pre><code>on:
+  push:
+    branches: ["main", "ci-setup"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:   # ejecución manual desde la pestaña Actions</code></pre>
+<p>El pipeline se ejecuta automáticamente al hacer <code>push</code> a
+<code>main</code> o <code>ci-setup</code>, al abrir un <em>pull request</em> hacia
+<code>main</code>, o manualmente.</p>
+
+<h3>4.2. Job 1 — <code>test</code> (CI)</h3>
+<table>
+    <tr><th>Elemento</th><th>Función</th></tr>
+    <tr><td><code>services: postgres</code></td><td>Levanta un contenedor
+        PostgreSQL 15 con un <em>healthcheck</em> para que los tests usen una BD real.</td></tr>
+    <tr><td><code>env</code></td><td>Define las variables que lee
+        <code>settings.py</code> (credenciales y host de la BD).</td></tr>
+    <tr><td><code>actions/checkout</code></td><td>Clona el repositorio en el runner.</td></tr>
+    <tr><td><code>setup-python 3.10</code></td><td>Instala Python 3.10 con caché de pip.</td></tr>
+    <tr><td><code>pip install -r requirements.txt</code></td><td>Instala dependencias.</td></tr>
+    <tr><td><code>manage.py check / migrate</code></td><td>Valida el proyecto y aplica migraciones.</td></tr>
+    <tr><td><code>manage.py test</code></td><td><strong>Ejecuta las 11 pruebas.</strong>
+        Si una falla, el pipeline se detiene.</td></tr>
+</table>
+
+<h3>4.3. Job 2 — <code>build</code> (Construcción + entrega)</h3>
+<table>
+    <tr><th>Elemento</th><th>Función</th></tr>
+    <tr><td><code>needs: test</code></td><td>El build <strong>solo corre si los tests
+        pasaron</strong>. Garantiza que nunca se empaqueta código roto.</td></tr>
+    <tr><td><code>setup-buildx</code></td><td>Prepara el motor de construcción de Docker.</td></tr>
+    <tr><td><code>docker build</code></td><td>Construye la imagen con dos etiquetas:
+        <code>latest</code> y el <code>SHA</code> del commit (trazabilidad).</td></tr>
+    <tr><td><code>docker save</code></td><td>Empaqueta la imagen en <code>gcs-web-image.tar</code>.</td></tr>
+    <tr><td><code>upload-artifact</code></td><td>Sube el <code>.tar</code> como
+        artefacto descargable desde GitHub.</td></tr>
+    <tr><td>Push a DockerHub <em>(simulado)</em></td><td>Imprime los comandos que se
+        ejecutarían en un despliegue real. El bloque real queda comentado y se activa
+        creando los <em>secrets</em> <code>DOCKERHUB_USER</code> y <code>DOCKERHUB_TOKEN</code>.</td></tr>
+</table>
+
+<!-- ===================== 5. DOCKER ===================== -->
+<h2>5. Contenedorización con Docker</h2>
+<h3>5.1. Dockerfile</h3>
+<p>Imagen base <code>python:3.10-slim</code>; instala dependencias en una capa
+separada (mejor caché), copia el proyecto y define un <code>ENTRYPOINT</code> que
+prepara el entorno antes de arrancar el servidor de aplicación <strong>Gunicorn</strong>.</p>
+<h3>5.2. entrypoint.sh</h3>
+<p>Espera a que PostgreSQL responda (<code>pg_isready</code>), aplica migraciones,
+recolecta archivos estáticos y finalmente ejecuta el comando del contenedor.</p>
+<h3>5.3. docker-compose.yml</h3>
+<table>
+    <tr><th>Servicio</th><th>Descripción</th></tr>
+    <tr><td><code>db</code></td><td>PostgreSQL 15 con volumen persistente
+        (<code>postgres_data</code>) y <em>healthcheck</em>.</td></tr>
+    <tr><td><code>web</code></td><td>Aplicación Django (Gunicorn). Depende de que
+        <code>db</code> esté <em>healthy</em>. Mapea <code>8000:8000</code>.</td></tr>
+</table>
+<div class="tip"><strong>Mapeo de puertos:</strong> <code>"8000:8000"</code> conecta
+el puerto 8000 del equipo con el 8000 del contenedor; por eso
+<code>http://localhost:8000</code> muestra la app que corre dentro de Docker.</div>
+
+<!-- ===================== 6. DESPLIEGUE ===================== -->
+<h2>6. Despliegue simulado</h2>
+<p>Se simuló un servidor de producción en la carpeta externa
+<code>C:\despliegue_gcs</code>:</p>
+<pre><code># 1) Carpeta externa que simula el servidor
+mkdir C:\despliegue_gcs &amp;&amp; cd C:\despliegue_gcs
+
+# 2) Descargar el proyecto
+git clone https://github.com/Eneritzch/P3_GCS.git &amp;&amp; cd P3_GCS
+
+# 3) Levantar con Docker Compose
+docker compose up -d --build
+
+# 4) Validar
+docker compose ps            # contenedores Up
+# Navegador → http://localhost:8000  (HTTP 200, app funcional)</code></pre>
+<p>Resultado: contenedores <code>gcs_web</code> y <code>gcs_db</code> en estado
+<span class="ok">Up</span>, respuesta <strong>HTTP 200</strong> y CRUD operativo.
+Los pasos completos están en <code>deploy-notes.md</code>.</p>
+
+<!-- ===================== 7. RECOMENDACIONES ===================== -->
+<h2>7. Recomendaciones finales</h2>
+<ul class="compact">
+    <li><strong>Gestión de secretos:</strong> no incluir <code>SECRET_KEY</code> ni
+        contraseñas en el código ni en <code>compose</code>; usar
+        <em>GitHub Secrets</em> y variables de entorno del servidor.</li>
+    <li><strong>DEBUG en producción:</strong> mantener <code>DJANGO_DEBUG=False</code>
+        y configurar <code>ALLOWED_HOSTS</code> con el dominio real.</li>
+    <li><strong>DockerHub real:</strong> activar el bloque comentado del job
+        <code>build</code> con <code>docker/login-action</code> y
+        <code>build-push-action</code> para publicar la imagen automáticamente.</li>
+    <li><strong>Calidad de código:</strong> añadir <em>linters</em> (flake8/black) y
+        cobertura de pruebas (<code>coverage</code>) como pasos del job <code>test</code>.</li>
+    <li><strong>Entornos:</strong> separar configuraciones de desarrollo y producción
+        y usar un servidor de estáticos (WhiteNoise o Nginx).</li>
+    <li><strong>Despliegue real:</strong> sustituir la simulación por un destino real
+        (servidor, VPS o servicio cloud) usando SSH o un runner autoalojado.</li>
+</ul>
+
+<!-- ===================== 8. CONCLUSIONES ===================== -->
+<h2>8. Conclusiones</h2>
+<p>El pipeline implementado cubre el ciclo completo de
+<strong>Integración y Entrega Continua</strong>: cada cambio subido a GitHub se
+prueba automáticamente, y solo si las pruebas pasan se construye y empaqueta la
+imagen Docker, lista para desplegarse. La contenedorización garantiza que la
+aplicación corra igual en cualquier entorno, eliminando el clásico problema de
+"en mi máquina sí funciona".</p>
+
+<h2>Anexo · Checklist de entregables</h2>
+<table>
+    <tr><th>Sesión</th><th>Entregable</th><th>Estado</th></tr>
+    <tr><td>1</td><td>Proyecto Django (manage.py, project/, app/, requirements.txt) + tests</td><td class="ok">✔</td></tr>
+    <tr><td>1</td><td>Rama <code>ci-setup</code> + <code>ci.yml</code> ejecutando tests</td><td class="ok">✔</td></tr>
+    <tr><td>2</td><td><code>Dockerfile</code> y <code>docker-compose.yml</code> funcionales</td><td class="ok">✔</td></tr>
+    <tr><td>3</td><td>Build de imagen + artefacto en Actions</td><td class="ok">✔</td></tr>
+    <tr><td>3</td><td>Despliegue simulado + <code>deploy-notes.md</code></td><td class="ok">✔</td></tr>
+    <tr><td>4</td><td>Documento técnico (este PDF) + repositorio actualizado</td><td class="ok">✔</td></tr>
+</table>
+
+<div class="footer">Flujo CI/CD para Django · GitHub Actions + Docker · 2026</div>
+
+</body>
+</html>
