@@ -1,0 +1,65 @@
+name: CI - Django Tests
+
+# Cuándo se ejecuta el pipeline
+on:
+  push:
+    branches: ["main", "ci-setup"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch: # permite ejecutarlo manualmente desde la pestaña Actions
+
+jobs:
+  test:
+    name: Ejecutar pruebas de Django
+    runs-on: ubuntu-latest
+
+    # Servicio de PostgreSQL para que los tests corran contra una BD real
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: gcs_db
+          POSTGRES_USER: gcs_user
+          POSTGRES_PASSWORD: gcs_pass
+        ports:
+          - 5432:5432
+        # Espera a que Postgres esté listo antes de continuar
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # Variables de entorno que lee project/settings.py
+    env:
+      DJANGO_SECRET_KEY: clave-de-prueba-para-ci
+      DJANGO_DEBUG: "False"
+      POSTGRES_DB: gcs_db
+      POSTGRES_USER: gcs_user
+      POSTGRES_PASSWORD: gcs_pass
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verificar el proyecto (django check)
+        run: python manage.py check
+
+      - name: Aplicar migraciones
+        run: python manage.py migrate
+
+      - name: Ejecutar pruebas
+        run: python manage.py test --verbosity 2
