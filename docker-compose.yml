@@ -1,0 +1,45 @@
+# Orquestación de contenedores para el proyecto Django.
+# Servicios:
+#   - db:  base de datos PostgreSQL
+#   - web: aplicación Django servida con Gunicorn
+
+services:
+  db:
+    image: postgres:15
+    container_name: gcs_db
+    environment:
+      POSTGRES_DB: gcs_db
+      POSTGRES_USER: gcs_user
+      POSTGRES_PASSWORD: gcs_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gcs_user -d gcs_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: gcs_web
+    # Arranca el servidor de aplicación (las migraciones las hace el entrypoint).
+    command: gunicorn project.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    environment:
+      DJANGO_SECRET_KEY: clave-para-docker-cambia-en-produccion
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+      POSTGRES_DB: gcs_db
+      POSTGRES_USER: gcs_user
+      POSTGRES_PASSWORD: gcs_pass
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

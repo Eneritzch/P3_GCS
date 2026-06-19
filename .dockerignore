@@ -1,0 +1,15 @@
+# No copiar al contexto de build
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.github/
+db.sqlite3
+*.sqlite3
+.env
+staticfiles/
+*.md
+.vscode/
+.idea/
